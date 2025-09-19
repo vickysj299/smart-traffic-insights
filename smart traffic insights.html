@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Traffic Insights for Indian Cities</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/date-fns/2.29.3/index.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 30px;
+            border-radius: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .header h1 {
+            color: #2c3e50;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(45deg, #3498db, #8e44ad);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header p {
+            color: #7f8c8d;
+            font-size: 1.1rem;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .control-panel {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .main-chart {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            position: relative;
+        }
+
+        .section-title {
+            color: #2c3e50;
+            font-size: 1.4rem;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+        }
+
+        .section-title::before {
+            content: '🚦';
+            margin-right: 10px;
+            font-size: 1.2rem;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #34495e;
+        }
+
+        .input-group input, .input-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ecf0f1;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .input-group input:focus, .input-group select:focus {
+            outline: none;
+            border-color: #3498db;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+        }
+
+        .btn {
+            background: linear-gradient(45deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            width: 100%;
+            margin-bottom: 15px;
+        }
+
+        .btn:hover {
+            background: linear-gradient(45deg, #2980b9, #1f639a);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(52, 152, 219, 0.4);
+        }
+
+        .btn:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(45deg, #27ae60, #219a52);
+        }
+
+        .btn-secondary:hover {
+            background: linear-gradient(45deg, #219a52, #1e8449);
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .metric-card {
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .metric-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(52, 152, 219, 0.1), transparent);
+            transform: rotate(45deg);
+            transition: all 0.5s ease;
+            opacity: 0;
+        }
+
+        .metric-card:hover {
+            border-color: #3498db;
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(52, 152, 219, 0.3);
+        }
+
+        .metric-card:hover::before {
+            opacity: 1;
+            animation: shimmer 1s ease-in-out;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
+            100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
+        }
+
+        .metric-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #e74c3c;
+            margin-bottom: 8px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .metric-label {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin-bottom: 20px;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 40px;
+            color: #3498db;
+            font-size: 18px;
+        }
+
+        .loading::after {
+            content: '';
+            display: block;
+            width: 40px;
+            height: 40px;
+            margin: 20px auto;
+            border: 4px solid #ecf0f1;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .insights-panel {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            margin-top: 20px;
+        }
+
+        .insights-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .insight-item {
+            padding: 15px;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #f8f9fa, #ffffff);
+            border-radius: 8px;
+            border-left: 4px solid #3498db;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .insight-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.2);
+        }
+
+        .junction-selector {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .junction-btn {
+            padding: 10px;
+            border: 2px solid #ecf0f1;
+            border-radius: 8px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .junction-btn.active {
+            background: linear-gradient(45deg, #3498db, #2980b9);
+            color: white;
+            border-color: #2980b9;
+        }
+
+        .junction-btn:hover:not(.active) {
+            border-color: #3498db;
+            background: #ecf0f1;
+        }
+
+        .prediction-status {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .status-active {
+            background: #27ae60;
+            color: white;
+        }
+
+        .status-inactive {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .current-time {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            font-size: 0.9rem;
+            color: #7f8c8d;
+        }
+
+        @media (max-width: 1200px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .metrics-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .metrics-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .container {
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚦 Smart Traffic Insights Dashboard</h1>
+            <p>AI-Powered Traffic Prediction System for Indian Cities</p>
+            <div class="current-time" id="currentTime"></div>
+        </div>
+
+        <div class="dashboard-grid">
+            <div class="control-panel">
+                <h3 class="section-title">Prediction Controls</h3>
+                
+                <div class="input-group">
+                    <label for="selectedDate">Select Date</label>
+                    <input type="date" id="selectedDate">
+                </div>
+                
+                <div class="input-group">
+                    <label>Junction Selection</label>
+                    <div class="junction-selector">
+                        <div class="junction-btn active" data-junction="1">J1</div>
+                        <div class="junction-btn" data-junction="2">J2</div>
+                        <div class="junction-btn" data-junction="3">J3</div>
+                        <div class="junction-btn" data-junction="4">J4</div>
+                    </div>
+                </div>
+                
+                <div class="input-group">
+                    <label for="predictionHour">Specific Hour Prediction</label>
+                    <select id="predictionHour">
+                        <option value="">Select Hour</option>
+                    </select>
+                </div>
+                
+                <button class="btn" onclick="generatePrediction()">
+                    Generate 24-Hour Prediction
+                </button>
+                
+                <button class="btn btn-secondary" onclick="predictSpecificHour()">
+                    Predict Specific Hour
+                </button>
+                
+                <div class="metrics-grid" id="currentMetrics" style="margin-top: 20px;">
+                    <div class="metric-card">
+                        <div class="metric-value" id="currentVehicles">--</div>
+                        <div class="metric-label">Current Vehicles</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="peakHour">--</div>
+                        <div class="metric-label">Peak Hour</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="avgVehicles">--</div>
+                        <div class="metric-label">Avg Vehicles/Day</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="trafficStatus">--</div>
+                        <div class="metric-label">Traffic Status</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="main-chart">
+                <div class="prediction-status status-inactive" id="predictionStatus">
+                    Waiting for Prediction
+                </div>
+                <h3 class="section-title">Traffic Prediction Chart</h3>
+                <div class="loading" id="loadingIndicator">
+                    Generating AI Predictions...
+                </div>
+                <div class="chart-container">
+                    <canvas id="trafficChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="insights-panel">
+            <h3 class="section-title">Smart Insights & Recommendations</h3>
+            <ul class="insights-list" id="insightsList">
+                <li class="insight-item">📊 Select a junction and date to generate traffic predictions</li>
+                <li class="insight-item">🕐 Use specific hour prediction for detailed analysis</li>
+                <li class="insight-item">📈 View 24-hour patterns to identify peak traffic times</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let currentChart = null;
+        let selectedJunction = 1;
+        let trafficData = null;
+
+        // Initialize the application
+        function initializeApp() {
+            // Set default date to today
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('selectedDate').value = today;
+            
+            // Populate hour selector
+            const hourSelect = document.getElementById('predictionHour');
+            for (let i = 0; i < 24; i++) {
+                const option = document.createElement('option');
+                option.value = i;
+                option.textContent = `${i.toString().padStart(2, '0')}:00`;
+                hourSelect.appendChild(option);
+            }
+            
+            // Update current time every minute
+            updateCurrentTime();
+            setInterval(updateCurrentTime, 60000);
+            
+            // Set up junction selector
+            setupJunctionSelector();
+            
+            // Initialize chart
+            initializeChart();
+        }
+
+        function updateCurrentTime() {
+            const now = new Date();
+            document.getElementById('currentTime').textContent = 
+                `Current Time: ${now.toLocaleString()}`;
+        }
+
+        function setupJunctionSelector() {
+            const junctionButtons = document.querySelectorAll('.junction-btn');
+            junctionButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    junctionButtons.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    selectedJunction = parseInt(btn.dataset.junction);
+                    
+                    // If we have data, update the chart
+                    if (trafficData && trafficData.junction === selectedJunction) {
+                        updateChart(trafficData);
+                    }
+                });
+            });
+        }
+
+        function initializeChart() {
+            const ctx = document.getElementById('trafficChart').getContext('2d');
+            
+            currentChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Predicted Vehicle Count',
+                        data: [],
+                        borderColor: '#3498db',
+                        backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4,
+                        pointBackgroundColor: '#3498db',
+                        pointBorderColor: '#2980b9',
+                        pointRadius: 6,
+                        pointHoverRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                usePointStyle: true,
+                                padding: 20
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: 'Traffic Prediction - 24 Hour View',
+                            font: {
+                                size: 16
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Number of Vehicles'
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Time of Day'
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)'
+                            }
+                        }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    },
+                    animation: {
+                        duration: 1000,
+                        easing: 'easeInOutQuart'
+                    }
+                }
+            });
+        }
+
+        // Mock ML model prediction function (replace with actual API call)
+        function mockMLPrediction(junction, date, hour = null) {
+            return new Promise((resolve) => {
+                setTimeout(() => {
+                    if (hour !== null) {
+                        // Single hour prediction
+                        const baseTraffic = junction * 2 + Math.random() * 5;
+                        let multiplier = 1;
+                        
+                        // Peak hours
+                        if ((hour >= 7 && hour <= 10) || (hour >= 17 && hour <= 20)) {
+                            multiplier = 1.8 + Math.random() * 0.4;
+                        } else if (hour >= 22 || hour <= 5) {
+                            multiplier = 0.3 + Math.random() * 0.2;
+                        } else {
+                            multiplier = 0.8 + Math.random() * 0.6;
+                        }
+                        
+                        const prediction = baseTraffic * multiplier;
+                        resolve({
+                            junction,
+                            hour,
+                            prediction: Math.round(prediction * 100) / 100,
+                            confidence: 0.85 + Math.random() * 0.1
+                        });
+                    } else {
+                        // 24-hour prediction
+                        const predictions = [];
+                        const baseTraffic = junction * 2 + Math.random() * 3;
+                        
+                        for (let h = 0; h < 24; h++) {
+                            let multiplier = 1;
+                            
+                            // Peak hours (7-10 AM, 5-8 PM)
+                            if ((h >= 7 && h <= 10) || (h >= 17 && h <= 20)) {
+                                multiplier = 1.5 + Math.random() * 0.5;
+                            } else if (h >= 22 || h <= 5) {
+                                // Low traffic hours
+                                multiplier = 0.2 + Math.random() * 0.3;
+                            } else {
+                                // Regular hours
+                                multiplier = 0.6 + Math.random() * 0.8;
+                            }
+                            
+                            predictions.push(Math.round(baseTraffic * multiplier * 100) / 100);
+                        }
+                        
+                        resolve({
+                            junction,
+                            date,
+                            predictions,
+                            confidence: 0.82 + Math.random() * 0.15
+                        });
+                    }
+                }, 1500); // Simulate API delay
+            });
+        }
+
+        async function generatePrediction() {
+            const date = document.getElementById('selectedDate').value;
+            if (!date) {
+                alert('Please select a date');
+                return;
+            }
+
+            // Show loading
+            document.getElementById('loadingIndicator').style.display = 'block';
+            document.getElementById('predictionStatus').textContent = 'Generating Predictions...';
+            document.getElementById('predictionStatus').className = 'prediction-status status-inactive';
+
+            try {
+                // Call ML model (mock)
+                const result = await mockMLPrediction(selectedJunction, date);
+                
+                trafficData = result;
+                updateChart(result);
+                updateMetrics(result);
+                generateInsights(result);
+                
+                document.getElementById('predictionStatus').textContent = 'Prediction Active';
+                document.getElementById('predictionStatus').className = 'prediction-status status-active';
+                
+            } catch (error) {
+                console.error('Prediction failed:', error);
+                alert('Failed to generate prediction. Please try again.');
+            } finally {
+                document.getElementById('loadingIndicator').style.display = 'none';
+            }
+        }
+
+        async function predictSpecificHour() {
+            const date = document.getElementById('selectedDate').value;
+            const hour = document.getElementById('predictionHour').value;
+            
+            if (!date || !hour) {
+                alert('Please select both date and hour');
+                return;
+            }
+
+            document.getElementById('loadingIndicator').style.display = 'block';
+
+            try {
+                const result = await mockMLPrediction(selectedJunction, date, parseInt(hour));
+                
+                // Update single metric
+                document.getElementById('currentVehicles').textContent = result.prediction.toFixed(1);
+                
+                // Generate specific insights
+                const insights = [
+                    `🎯 Predicted ${result.prediction.toFixed(1)} vehicles at ${hour}:00`,
+                    `📊 Confidence: ${(result.confidence * 100).toFixed(1)}%`,
+                    `🚦 Junction ${selectedJunction} analysis complete`,
+                    result.prediction > 15 ? '⚠️ High traffic expected' : '✅ Normal traffic levels'
+                ];
+                
+                updateInsightsList(insights);
+                
+            } catch (error) {
+                console.error('Hour prediction failed:', error);
+                alert('Failed to predict specific hour. Please try again.');
+            } finally {
+                document.getElementById('loadingIndicator').style.display = 'none';
+            }
+        }
+
+        function updateChart(data) {
+            if (!currentChart) return;
+
+            const labels = [];
+            const chartData = data.predictions || [data.prediction];
+            
+            if (data.predictions) {
+                // 24-hour data
+                for (let i = 0; i < 24; i++) {
+                    labels.push(`${i.toString().padStart(2, '0')}:00`);
+                }
+            } else {
+                // Single hour data
+                labels.push(`${data.hour.toString().padStart(2, '0')}:00`);
+            }
+
+            currentChart.data.labels = labels;
+            currentChart.data.datasets[0].data = chartData;
+            currentChart.options.plugins.title.text = 
+                `Traffic Prediction - Junction ${data.junction} (${document.getElementById('selectedDate').value})`;
+            
+            currentChart.update('active');
+        }
+
+        function updateMetrics(data) {
+            if (!data.predictions) return;
+
+            const predictions = data.predictions;
+            const maxTraffic = Math.max(...predictions);
+            const peakHourIndex = predictions.indexOf(maxTraffic);
+            const avgTraffic = predictions.reduce((a, b) => a + b, 0) / predictions.length;
+            
+            document.getElementById('currentVehicles').textContent = predictions[new Date().getHours()].toFixed(1);
+            document.getElementById('peakHour').textContent = `${peakHourIndex.toString().padStart(2, '0')}:00`;
+            document.getElementById('avgVehicles').textContent = avgTraffic.toFixed(1);
+            
+            // Traffic status based on current prediction
+            const currentPrediction = predictions[new Date().getHours()];
+            let status = 'Low';
+            let statusColor = '#27ae60';
+            
+            if (currentPrediction > avgTraffic * 1.5) {
+                status = 'High';
+                statusColor = '#e74c3c';
+            } else if (currentPrediction > avgTraffic) {
+                status = 'Medium';
+                statusColor = '#f39c12';
+            }
+            
+            const statusElement = document.getElementById('trafficStatus');
+            statusElement.textContent = status;
+            statusElement.style.color = statusColor;
+        }
+
+        function generateInsights(data) {
+            const predictions = data.predictions;
+            const insights = [];
+            
+            // Find peak hours
+            const maxTraffic = Math.max(...predictions);
+            const peakHours = predictions.map((val, idx) => val === maxTraffic ? idx : -1)
+                                        .filter(idx => idx !== -1);
+            
+            insights.push(`🚀 Peak traffic at ${peakHours[0].toString().padStart(2, '0')}:00 with ${maxTraffic.toFixed(1)} vehicles`);
+            
+            // Find low traffic periods
+            const minTraffic = Math.min(...predictions);
+            const lowHour = predictions.indexOf(minTraffic);
+            insights.push(`😌 Lowest traffic at ${lowHour.toString().padStart(2, '0')}:00 with ${minTraffic.toFixed(1)} vehicles`);
+            
+            // Average comparison
+            const avgTraffic = predictions.reduce((a, b) => a + b, 0) / predictions.length;
+            insights.push(`📊 Average daily traffic: ${avgTraffic.toFixed(1)} vehicles per hour`);
+            
+            // Current status
+            const currentHour = new Date().getHours();
+            const currentTraffic = predictions[currentHour];
+            if (currentTraffic > avgTraffic * 1.2) {
+                insights.push('⚠️ Current traffic is above average - consider alternative routes');
+            } else {
+                insights.push('✅ Current traffic levels are normal');
+            }
+            
+            // Junction-specific insights
+            insights.push(`🎯 Junction ${data.junction} analysis complete with ${(data.confidence * 100).toFixed(1)}% confidence`);
+            
+            updateInsightsList(insights);
+        }
+
+        function updateInsightsList(insights) {
+            const list = document.getElementById('insightsList');
+            list.innerHTML = '';
+            
+            insights.forEach(insight => {
+                const li = document.createElement('li');
+                li.className = 'insight-item';
+                li.textContent = insight;
+                list.appendChild(li);
+            });
+        }
+
+        // Initialize app when page loads
+        document.addEventListener('DOMContentLoaded', initializeApp);
+    </script>
+</body>
+</html>
